@@ -1,0 +1,16 @@
+# Mirror di C:\Argo\SQLDatabase\DATABASE.txt (SERVER01) — un engine "argo",
+# tutti i database, porta 49152 come su Windows.
+-n argo
+-o /var/log/asa8-argosql.log
+-x tcpip(PORT=49152)
+/srv/asa/Protocollo.db
+/srv/asa/Magazzino.db
+/srv/asa/Alunni.db
+/srv/asa/InventA.db
+/srv/asa/InventS.db
+/srv/asa/InventR.db
+/srv/asa/InventP.db
+/srv/asa/InventC.db
+/srv/asa/Rinnova_scuole.db
+/srv/asa/Fisco2014.db
+/srv/asa/rinnovo_4083.db

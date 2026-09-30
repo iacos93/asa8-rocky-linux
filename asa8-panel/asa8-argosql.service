@@ -1,0 +1,14 @@
+[Unit]
+Description=ASA8 argo (@/srv/asa/DATABASE.txt :49152, come ArgoSQL su Windows)
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/opt/asa8-panel/asa-start.sh argo @/srv/asa/DATABASE.txt
+ExecStop=/opt/asa8-panel/asa-stop.sh argo
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target

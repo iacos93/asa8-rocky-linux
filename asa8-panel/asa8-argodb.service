@@ -1,0 +1,14 @@
+[Unit]
+Description=ASA8 argodb (/srv/asa/ArgoDb.db :2638)
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/opt/asa8-panel/asa-start.sh argodb /srv/asa/ArgoDb.db 2638 /var/log/asa8-argodb.log
+ExecStop=/opt/asa8-panel/asa-stop.sh argodb
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target

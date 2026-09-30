@@ -1,0 +1,13 @@
+[Unit]
+Description=ASA8 Panel web (Sybase Central like)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/asa8-panel/panel.py
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ASA8 Console — gestione database asa8-prod</title>
+<style>
+:root{
+  --bg:#eef2f7; --surface:#ffffff; --surface-2:#f7fafc;
+  --ink:#0f1b2d; --muted:#5b6b82; --line:#dfe7f0;
+  --brand:#0e7c7b; --brand-dark:#0a5f5e; --brand-soft:#e0f2f1;
+  --accent:#b45309; --accent-soft:#fef3c7;
+  --danger:#dc2626; --danger-soft:#fee2e2;
+  --ok:#15803d; --ok-soft:#dcfce7;
+  --radius:12px; --shadow:0 1px 2px rgba(15,27,45,.06),0 4px 14px rgba(15,27,45,.06);
+  --mono:ui-monospace,"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",sans-serif}
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+.side{background:#0f1b2d;color:#dbe4f0;padding:20px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:18px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#0e7c7b,#14b8a6);
+  display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;flex:none}
+.brand b{font-size:15px;display:block;line-height:1.2}
+.brand span{font-size:11.5px;color:#8fa0b8}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{color:#c4d0e2;text-decoration:none;font-size:13.5px;padding:9px 10px;border-radius:8px;display:flex;gap:10px;align-items:center}
+.nav a svg{flex:none;opacity:.8}
+.nav a:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav a.active{background:rgba(20,184,166,.18);color:#fff}
+.side-foot{margin-top:auto;font-size:11.5px;color:#8fa0b8;padding:0}
+.sf-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:10px 12px}
+.sf-status{display:flex;align-items:center;gap:7px;font-weight:700;color:#fff;font-size:12.5px;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.09)}
+.sf-ports{display:flex;flex-direction:column;gap:3px}
+.sf-ports div{display:flex;justify-content:space-between;align-items:center}
+.sf-ports code{font-family:var(--mono);font-size:11.5px;color:#dbe4f0}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#34d399;display:inline-block;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 26px;
+  display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
+.topbar h1{font-size:17px;margin:0;font-weight:700}
+.topbar .sub{color:var(--muted);font-size:12.5px}
+.top-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+.status-pill{font-size:12.5px;font-weight:600;border-radius:999px;padding:6px 12px;background:var(--surface-2);border:1px solid var(--line)}
+.status-pill.ok{background:var(--ok-soft);border-color:#bbf7d0;color:var(--ok)}
+.status-pill.warn{background:var(--accent-soft);border-color:#fde68a;color:var(--accent)}
+.content{padding:22px 26px 60px;max-width:1180px;width:100%;margin:0 auto}
+/* ---------- KPI ---------- */
+.page{display:none}.page.on{display:block;animation:fadein .18s ease}@keyframes fadein{from{opacity:0}to{opacity:1}}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px}
+.kpi .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.kpi .num{font-size:27px;font-weight:800;margin:2px 0}
+.kpi .hint{font-size:12px;color:var(--muted)}
+.kpi.accent{border-top:3px solid var(--brand)}
+/* ---------- cards / sections ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:16px}
+.card>h2{margin:0 0 4px;font-size:15.5px;display:flex;align-items:center;gap:9px}
+.card>h2 svg{color:var(--brand)}
+.card .desc{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+label.field{display:block;font-size:12.5px;font-weight:600;margin:0 0 10px}
+label.field span{display:block;margin-bottom:4px}
+input[type=text],input:not([type]),input[type=password],input[type=number],input[type=file],select,textarea{
+  width:100%;background:#fff;color:var(--ink);border:1px solid #c6d2e0;border-radius:8px;
+  padding:9px 11px;font:13.5px/1.45 inherit;min-height:44px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+textarea{font-family:var(--mono);font-size:12.5px;min-height:110px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+code.mono,.mono{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+/* ---------- buttons ---------- */
+.btn{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:700;
+  cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-height:44px}
+.btn:hover{background:var(--brand-dark)}
+.btn:disabled{opacity:.55;cursor:wait}
+.btn.secondary{background:#e6edf5;color:var(--ink)}
+.btn.secondary:hover{background:#d5e0ec}
+.btn.danger{background:var(--danger)}
+.btn.danger:hover{background:#b91c1c}
+.btn.small{min-height:36px;padding:7px 12px;font-size:12.5px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+:focus-visible{outline:3px solid #14b8a6;outline-offset:2px}
+/* ---------- engine board (signature) ---------- */
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.engine{background:linear-gradient(180deg,#10233a,#0f1b2d);color:#e6eef7;border-radius:var(--radius);padding:14px 15px;position:relative;overflow:hidden}
+.engine::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#34d399}
+.engine.down::before{background:#f59e0b}
+.engine .ename{font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px}
+.engine .edot{width:9px;height:9px;border-radius:50%;background:#34d399;animation:pulse 2s infinite;flex:none}
+.engine.down .edot{background:#f59e0b;animation:none}
+.engine .emeta{font-family:var(--mono);font-size:11.5px;color:#9fb0c7;margin:6px 0 10px;overflow-wrap:anywhere}
+.badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px}
+.badge.ok{background:rgba(52,211,153,.16);color:#6ee7b7;border:1px solid rgba(52,211,153,.4)}
+.badge.warn{background:rgba(245,158,11,.16);color:#fcd34d;border:1px solid rgba(245,158,11,.4)}
+.badge.use{background:var(--ok-soft);color:var(--ok);border:1px solid #bbf7d0}
+.empty{border:1.5px dashed #b9c6d8;border-radius:var(--radius);padding:22px;text-align:center;color:var(--muted);background:var(--surface)}
+/* ---------- output / log ---------- */
+pre.out{background:#0f1b2d;color:#d7e3f4;border-radius:8px;padding:12px;font-family:var(--mono);font-size:12px;
+  max-height:300px;overflow:auto;white-space:pre-wrap;margin:10px 0 0}
+pre.out:empty{display:none}
+pre.out.ok{border-left:4px solid #34d399}
+pre.out.err{border-left:4px solid #f87171}
+/* ---------- toast ---------- */
+#toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:100;max-width:min(420px,90vw)}
+.toast{background:#0f1b2d;color:#fff;border-radius:10px;padding:12px 15px;font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.3);
+  border-left:4px solid var(--brand);animation:slidein .25s ease}
+.toast.ok{border-left-color:#34d399}.toast.err{border-left-color:#f87171}
+@keyframes slidein{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+.skel{border-radius:8px;background:linear-gradient(90deg,#e6edf5 25%,#f4f7fb 50%,#e6edf5 75%);background-size:200% 100%;animation:sh 1.2s infinite;min-height:58px}
+@keyframes sh{to{background-position:-200% 0}}
+.checkline{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px}
+.checkline input{width:18px;height:18px;accent-color:var(--brand)}
+.drop{border:2px dashed #b9c6d8;border-radius:10px;padding:26px 16px;text-align:center;background:var(--surface-2);cursor:pointer;color:var(--muted)}
+.drop:hover{border-color:var(--brand)}
+.drop.over{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)}
+.drop svg{display:block;margin:0 auto 8px;color:var(--brand)}
+.drop b{display:block;color:var(--ink);font-size:14px}
+.drop span{font-size:12px}
+.filelist{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.filelist:empty{display:none}
+.filerow{display:flex;gap:8px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12.5px}
+.filerow .fname{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;flex:1}
+.filerow .fsize{color:var(--muted);white-space:nowrap}
+progress{width:100%;height:10px;margin-top:10px;appearance:none;-webkit-appearance:none}
+progress::-webkit-progress-bar{background:#e6edf5;border-radius:99px}
+progress::-webkit-progress-value{background:var(--brand);border-radius:99px}
+progress::-moz-progress-bar{background:var(--brand);border-radius:99px}
+.spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+footer.foot{color:var(--muted);font-size:12px;text-align:center;padding:18px}
+@media(max-width:960px){
+  .shell{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:column}
+  .nav{flex-direction:row;overflow-x:auto;padding-bottom:4px}
+  .nav a{white-space:nowrap}
+  .side-foot{display:none}
+  .kpis{grid-template-columns:1fr 1fr}
+  .grid2,.row2{grid-template-columns:1fr}
+  .content{padding:16px 14px 60px}
+  .topbar{padding:10px 14px;flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side" aria-label="Navigazione">
+    <div class="brand"><div class="brand-mark">A8</div>
+      <div><b>ASA8 Console</b><span>asa8-prod</span></div></div>
+    <nav class="nav" id="nav">
+      <a href="#/panoramica" data-route="panoramica" class="active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Panoramica</a>
+      <a href="#/engine" data-route="engine"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>Engine</a>
+      <a href="#/database" data-route="database"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>Database</a>
+      <a href="#/importa" data-route="importa"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Importa</a>
+      <a href="#/servizi" data-route="servizi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Avvii automatici</a>
+      <a href="#/sql" data-route="sql"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>SQL</a>
+      <a href="#/log" data-route="log"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Log</a>
+    </nav>
+    <div class="side-foot"><div class="sf-card">
+      <div class="sf-status"><span class="live-dot" aria-hidden="true"></span><span id="side-status">connessione…</span></div>
+      <div class="sf-ports">
+        <div><span>argo</span><code>:49152</code></div>
+        <div><span>argodb</span><code>:2638</code></div>
+        <div><span>panel</span><code>:8181</code></div>
+      </div>
+    </div></div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div><h1 id="page-title">Panoramica</h1><div class="sub" id="top-sub">caricamento stato…</div></div>
+      <div class="top-actions">
+        <span class="status-pill" id="pill">…</span>
+        <button class="btn secondary small" id="btn-refresh" onclick="refresh()">Aggiorna</button>
+        <button class="btn secondary small" onclick="doLogout()">Esci</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="page on" id="page-panoramica">
+      <div class="kpis" role="region" aria-label="Indicatori">
+        <div class="kpi accent"><div class="lbl">Engine accesi</div><div class="num" id="k-eng">–</div><div class="hint" id="k-eng-h">…</div></div>
+        <div class="kpi accent"><div class="lbl">Database</div><div class="num" id="k-db">–</div><div class="hint" id="k-db-h">…</div></div>
+        <div class="kpi accent"><div class="lbl">Avvii automatici</div><div class="num" id="k-svc">–</div><div class="hint" id="k-svc-h">…</div></div>
+        <div class="kpi accent"><div class="lbl">Host</div><div class="num" style="font-size:17px" id="k-ip">–</div><div class="hint" id="k-time">…</div></div>
+      </div>
+      <section class="card" id="engine" aria-label="Engine in esecuzione">
+        <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>Engine in esecuzione</h2>
+        <p class="desc">Stato in tempo reale. Per fermare un engine serve conferma.</p>
+        <div class="board" id="board"><div class="skel"></div></div>
+      </section>
+      </div>
+      <div class="page" id="page-engine">
+      <div class="grid2">
+        <section class="card" aria-label="Avvia engine">
+          <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>Avvia engine</h2>
+          <p class="desc">Avvia un database. Alla fine controlla da solo che risponda.</p>
+          <label class="field"><span>Nome engine</span><input id="s_eng" value="argodb" autocomplete="off"></label>
+          <label class="field"><span>File database</span><input id="s_db" value="/srv/asa/ArgoDb.db" class="mono" autocomplete="off"></label>
+          <div class="row2">
+            <label class="field"><span>Porta (vuoto = 2638)</span><input id="s_port" inputmode="numeric" placeholder="2638" autocomplete="off"></label>
+            <label class="field"><span>File di log</span><input id="s_log" class="mono" placeholder="/tmp/asa8-asademo.log" autocomplete="off"></label>
+          </div>
+          <label class="field"><span>Opzioni extra (facoltativo)</span><input id="s_extra" class="mono" placeholder="es. -c 64M" autocomplete="off"></label>
+          <div class="btn-row"><button class="btn" id="b-start" onclick="doStart()">Avvia engine</button></div>
+          <pre class="out" id="s_out" aria-live="polite"></pre>
+        </section>
+        <section class="card" aria-label="Ferma engine">
+          <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Ferma engine</h2>
+          <p class="desc">Ferma un engine e chiude le sue connessioni. Chiede conferma.</p>
+          <label class="field"><span>Engine</span><input id="k_eng" value="argodb" autocomplete="off"></label>
+          <div class="row2">
+            <label class="field"><span>Utente</span><input id="k_user" value="dba" autocomplete="off"></label>
+            <label class="field"><span>Password</span><input id="k_pwd" type="password" value="sql" autocomplete="off"></label>
+          </div>
+          <div class="btn-row"><button class="btn danger" id="b-stop" onclick="doStop()">Ferma engine</button></div>
+          <pre class="out" id="k_out" aria-live="polite"></pre>
+        </section>
+      </div>
+      </div>
+      <div class="page" id="page-database">
+      <div class="grid2" id="database">
+        <section class="card" aria-label="Database presenti">
+          <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>Database presenti</h2>
+          <p class="desc">I database salvati in questo server. “Seleziona” lo prepara per l'avvio.</p>
+          <div id="dbtab"><div class="skel"></div></div>
+        </section>
+        <section class="card" aria-label="Crea database">
+          <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crea nuovo database</h2>
+          <p class="desc">Crea un database nuovo e vuoto. Cartella consigliata: <span class="mono">/srv/asa/</span>.</p>
+          <label class="field"><span>Nome e cartella del nuovo database</span><input id="c_path" class="mono" value="/srv/asa/nuovodb.db" autocomplete="off"></label>
+          <div class="btn-row"><button class="btn" id="b-create" onclick="doCreate()">Crea database</button></div>
+          <pre class="out" id="c_out" aria-live="polite"></pre>
+        </section>
+      </div>
+      </div>
+      <div class="page" id="page-importa">
+      <div class="grid2">
+      <section class="card" aria-label="Carica dal PC">
+        <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Carica dal PC</h2>
+        <p class="desc">I file finiscono in <span class="mono">/srv/asa/</span>, pronti da avviare. Il .log non serve: si ricrea da solo.</p>
+        <div class="drop" id="imp_drop" role="button" tabindex="0" aria-label="Trascina file .db qui o premi Invio per sfogliarli">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <b>Trascina i file .db qui</b>
+          <span>oppure premi per sfogliare — anche più di uno</span>
+          <input id="imp_file" type="file" accept=".db" multiple hidden>
+        </div>
+        <div class="filelist" id="imp_list" aria-live="polite"></div>
+        <label class="checkline"><input type="checkbox" id="imp_over"> Sovrascrivi se esiste già</label>
+        <div class="btn-row"><button class="btn" id="b-imp" onclick="doImport()">Carica</button></div>
+        <progress id="imp_prog" max="100" value="0" style="display:none"></progress>
+        <pre class="out" id="imp_out" aria-live="polite"></pre>
+      </section>
+      <section class="card" aria-label="File sul server">
+        <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>File sul server</h2>
+        <p class="desc"><span class="mono">/srv/asa/</span> — “In uso” = aperto da un engine o nel DATABASE.txt.</p>
+        <div id="srvtab"><div class="skel"></div></div>
+      </section>
+      </div>
+      </div>
+      <div class="page" id="page-servizi">
+      <section class="card" id="servizi" aria-label="Avvii automatici">
+        <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Avvii automatici</h2>
+        <p class="desc">Accende gli engine da soli all'avvio del server. Gestisci quelli esistenti o creane uno nuovo.</p>
+        <div id="svctab"><div class="skel"></div></div>
+        <div class="grid2" style="margin-top:14px">
+          <label class="field"><span>Nome servizio</span><input id="v_name" value="nuovo" autocomplete="off"></label>
+          <label class="field"><span>Engine</span><input id="v_eng" value="nuovo" autocomplete="off"></label>
+          <label class="field"><span>Database</span><input id="v_db" class="mono" value="/srv/asa/nuovo.db" autocomplete="off"></label>
+          <label class="field"><span>Porta (vuoto = 2638)</span><input id="v_port" inputmode="numeric" placeholder="2638" autocomplete="off"></label>
+        </div>
+        <label class="checkline"><input type="checkbox" id="v_auto" checked> Attiva e avvia subito</label>
+        <div class="btn-row"><button class="btn" id="b-svc" onclick="doService()">Crea servizio</button></div>
+        <pre class="out" id="v_out" aria-live="polite"></pre>
+      </section>
+      </div>
+      <div class="page" id="page-sql">
+      <section class="card" id="sql" aria-label="Console SQL">
+        <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>Comandi SQL</h2>
+        <p class="desc">Scrivi comandi ed eseguili sul database. Scorciatoia: Ctrl+Invio.</p>
+        <div class="row2">
+          <label class="field"><span>Engine</span><input id="q_eng" value="argo" autocomplete="off"></label>
+          <label class="field"><span>Utente</span><input id="q_user" value="dba" autocomplete="off"></label>
+        </div>
+        <label class="field"><span>SQL</span><textarea id="q_sql">select * from systable;</textarea></label>
+        <div class="btn-row"><button class="btn" id="b-sql" onclick="doSql()">Esegui SQL</button></div>
+        <pre class="out" id="q_out" aria-live="polite"></pre>
+      </section>
+      </div>
+      <div class="page" id="page-log">
+      <section class="card" id="log" aria-label="Log engine">
+        <h2><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Log engine</h2>
+        <p class="desc">Mostra le ultime 100 righe di un file di log.</p>
+        <label class="field"><span>File di log</span><input id="log_path" class="mono" placeholder="/var/log/asa8-argo.log" autocomplete="off"></label>
+        <div class="btn-row"><button class="btn secondary" id="b-log" onclick="doLog()">Mostra log</button></div>
+        <pre class="out" id="log_out" aria-live="polite"></pre>
+      </section>
+      </div>
+      <footer class="foot">ASA8 Console · asa8-prod</footer>
+    </div>
+  </div>
+</div>
+<div id="toasts" aria-live="polite" aria-atomic="false"></div>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+async function j(url,body){
+  const r=await fetch(url,{method:body?"POST":"GET",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+  if(r.status===401){location.href="/login";throw 0;}
+  return r.json();
+}
+function toast(msg,ok){
+  const t=document.createElement("div");t.className="toast "+(ok===false?"err":ok===true?"ok":"");
+  t.textContent=msg; $("toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";setTimeout(()=>t.remove(),300);},4200);
+}
+function busy(btn,on,label){
+  if(!btn)return;
+  if(on){btn.dataset.t=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spin" aria-hidden="true"></span> '+esc(label||"Attendi…");}
+  else{btn.disabled=false;if(btn.dataset.t)btn.innerHTML=btn.dataset.t;}
+}
+function out(id,ok,text){const e=$(id);e.textContent=(ok?"Fatto\n":"Errore\n")+text;e.className="out "+(ok?"ok":"err");}
+function v(id){return $(id).value.trim();}
+function fmtMB(b){if(b<0)return "?";return (b/1048576).toFixed(1)+" MB";}
+function fmtDate(s){if(!s)return "—";try{return new Date(s*1000).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric"});}catch(e){return "—";}}
+function shortName(p){return String(p||"").split("/").pop();}
+function renderSrvFiles(o){
+  const rows=(o.dbs||[]).filter(d=>String(d.path).indexOf("/srv/asa/")===0);
+  if(!rows.length){$("srvtab").innerHTML='<div class="empty">Niente qui. Carica il primo file da sinistra.</div>';return;}
+  $("srvtab").innerHTML="<table><thead><tr><th>File</th><th>Dim.</th><th>Aggiornato</th><th>Stato</th></tr></thead><tbody>"+
+    rows.map(d=>"<tr><td><span class='mono'>"+esc(shortName(d.path))+"</span></td><td>"+fmtMB(d.size)+"</td><td>"+fmtDate(d.mtime)+"</td><td>"+(d.used?'<span class="badge use">In uso</span>':"<span class='muted'>—</span>")+"</td></tr>").join("")+"</tbody></table>";
+}
+let LAST={dbs:[],engines:[]};
+async function refresh(){
+  let o;
+  try{o=await j("/api/overview");}
+  catch(e){$("top-sub").textContent="panel non raggiungibile";$("pill").textContent="offline";$("pill").className="status-pill warn";$("side-status").textContent="offline";return;}
+  LAST=o;
+  const ne=o.engines.length, nd=o.dbs.length;
+  const nsvc=o.services.filter(s=>/active|running/.test(s.active+s.sub)).length;
+  $("k-eng").textContent=ne; $("k-eng-h").textContent=ne?o.engines.map(e=>e.engine).join(", "):"tutto fermo";
+  $("k-db").textContent=nd; $("k-db-h").textContent=nd+" database trovati";
+  $("k-svc").textContent=o.services.length; $("k-svc-h").textContent=nsvc+" attivi";
+  $("k-ip").textContent=o.ip||"?"; $("k-time").textContent=o.now||"";
+  renderSrvFiles(o);
+  $("top-sub").textContent="Host "+(o.ip||"?")+" · "+(o.now||"");
+  const pill=$("pill");
+  if(ne){pill.textContent=ne+" engine accesi";pill.className="status-pill ok";}
+  else{pill.textContent="tutto fermo";pill.className="status-pill warn";}
+  $("side-status").textContent=ne?ne+" engine accesi":"tutto fermo";
+  // engine board
+  const b=$("board");
+  if(!ne){b.innerHTML='<div class="empty">Nessun engine acceso. Per iniziare bastano nome e file qui sotto.</div>';}
+  else{b.innerHTML=o.engines.map(e=>{
+    const up=/ok|successful/i.test(e.ping||"");
+    return '<div class="engine'+(up?"":" down")+'"><div class="ename"><span class="edot" aria-hidden="true"></span>'+esc(e.engine)+
+      ' <span class="badge '+(up?"ok":"warn")+'">'+(up?"online":"non risponde")+'</span></div>'+
+      '<div class="emeta">pid '+esc(e.pid)+" · "+esc(e.db)+"</div>"+
+      '<div class="btn-row" style="margin:0"><button class="btn secondary small" onclick="quickStop(\''+esc(e.engine).replace(/'/g,"")+'\')">Ferma</button>'+
+      '<button class="btn secondary small" onclick="fillSql(\''+esc(e.engine).replace(/'/g,"")+'\')">SQL</button></div></div>';
+  }).join("");}
+  // db table
+  $("dbtab").innerHTML="<table><thead><tr><th>Database</th><th>Dim.</th><th></th></tr></thead><tbody>"+
+    o.dbs.map(d=>"<tr><td><span class='mono'>"+esc(d.path)+"</span></td><td>"+fmtMB(d.size)+"</td>"+
+      "<td style='white-space:nowrap'><button class='btn secondary small' onclick=\"useDb('"+esc(d.path).replace(/'/g,"")+"')\">Seleziona</button></td></tr>").join("")+
+    "</tbody></table>";
+  // services
+  const dot=s=>/active|running/.test(s)?'<span class="badge ok">attivo</span>':"<span class='badge warn'>"+esc(s||"—")+"</span>";
+  $("svctab").innerHTML="<table><thead><tr><th>Unit</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>"+
+    (o.services.length?o.services.map(s=>"<tr><td><span class='mono'>"+esc(s.unit)+"</span></td><td>"+dot(s.active+" "+s.sub)+"</td>"+
+      "<td style='white-space:nowrap'>"+
+      "<button class='btn secondary small' onclick=\"svcGo2('"+esc(s.unit)+"','start')\">start</button> "+
+      "<button class='btn secondary small' onclick=\"svcGo2('"+esc(s.unit)+"','stop')\">stop</button> "+
+      "<button class='btn secondary small' onclick=\"svcGo2('"+esc(s.unit)+"','restart')\">restart</button></td></tr>").join(""):
+      "<tr><td colspan='3'>Nessun avvio automatico. Creane uno qui sotto.</td></tr>")+"</tbody></table>";
+}
+function useDb(p){$("s_db").value=p;const m=p.match(/([^\/]+)\.db$/);if(m)$("s_eng").value=m[1].replace(/[^A-Za-z0-9_-]/g,"").slice(0,32)||$("s_eng").value;toast("Pronto per l'avvio: premi Avvia engine",true);go("engine");}
+async function quickStop(e){
+  if(!confirm("Fermare '"+e+"'? Chiude tutte le sue connessioni."))return;
+  toast("Arresto di '"+e+"' in corso…");
+  try{const o=await j("/api/stop",{engine:e,user:"dba",password:"sql"});
+    toast(o.ok?"'"+e+"' fermato":"Stop non riuscito: vedi Ferma engine",o.ok);}catch(err){toast("Stop non riuscito",false);}
+  refresh();
+}
+function fillSql(e){$("q_eng").value=e;go("sql");}
+async function doStart(){
+  const btn=$("b-start");busy(btn,true,"Avvio…");
+  try{const o=await j("/api/start",{engine:v("s_eng"),db:v("s_db"),port:v("s_port"),log:v("s_log"),extra:v("s_extra")});
+    out("s_out",o.ok,o.output);toast(o.ok?"Engine avviato":"Avvio non riuscito",o.ok);}catch(e){out("s_out",false,String(e));}
+  busy(btn,false);refresh();
+}
+async function doStop(){
+  const eng=v("k_eng");
+  if(!confirm("Fermare '"+eng+"'? Chiude tutte le sue connessioni."))return;
+  const btn=$("b-stop");busy(btn,true,"Arresto…");
+  try{const o=await j("/api/stop",{engine:eng,user:v("k_user"),password:$("k_pwd").value});
+    out("k_out",o.ok,o.output);toast(o.ok?"Engine fermato":"Stop non riuscito",o.ok);}catch(e){out("k_out",false,String(e));}
+  busy(btn,false);refresh();
+}
+async function doCreate(){
+  const btn=$("b-create");busy(btn,true,"Creazione…");
+  try{const o=await j("/api/createdb",{path:v("c_path")});
+    out("c_out",o.ok,o.output);toast(o.ok?"Database creato":"Creazione non riuscita",o.ok);}catch(e){out("c_out",false,String(e));}
+  busy(btn,false);refresh();
+}
+async function doService(){
+  const btn=$("b-svc");busy(btn,true,"Creazione…");
+  try{const o=await j("/api/mkservice",{name:v("v_name"),engine:v("v_eng"),db:v("v_db"),port:v("v_port"),autostart:$("v_auto").checked});
+    out("v_out",o.ok,o.output);toast(o.ok?"Avvio automatico creato":"Creazione non riuscita",o.ok);}catch(e){out("v_out",false,String(e));}
+  busy(btn,false);refresh();
+}
+async function doSql(){
+  const btn=$("b-sql");busy(btn,true,"Eseguo…");
+  try{const o=await j("/api/sql",{engine:v("q_eng"),user:v("q_user"),sql:$("q_sql").value});
+    out("q_out",o.ok,o.output);toast(o.ok?"Comando eseguito":"Errore nel comando",o.ok);}catch(e){out("q_out",false,String(e));}
+  busy(btn,false);
+}
+async function svcGo2(unit,action){
+  const IT={start:["Avvio","avviato"],stop:["Arresto","fermato"],restart:["Riavvio","riavviato"]};
+  const short=unit.replace(/^asa8-/,"").replace(/\.service$/,"");
+  if(action==="stop"&&!confirm("Fermare '"+short+"'?"))return;
+  toast(IT[action][0]+" di '"+short+"' in corso…");
+  try{const o=await j("/api/svc-action",{unit:unit,action:action});toast(o.ok?"'"+short+"' "+IT[action][1]:("Non riuscito: "+o.output.slice(-200)),o.ok);}
+  catch(e){toast("Non riuscito",false);}
+  refresh();
+}
+async function doLog(){
+  const btn=$("b-log");busy(btn,true,"Carico…");
+  try{const p=v("log_path");const o=await j("/api/logs?file="+encodeURIComponent(p));
+    const e=$("log_out");e.textContent=o.output;e.className="out "+(o.ok?"ok":"err");}catch(e){out("log_out",false,String(e));}
+  busy(btn,false);
+}
+function uploadOne(f,ow,prog){
+  return new Promise((resolve,reject)=>{
+    const x=new XMLHttpRequest();
+    x.open("POST","/api/import?filename="+encodeURIComponent(f.name)+"&overwrite="+ow);
+    x.upload.onprogress=e=>{if(e.lengthComputable)prog.value=Math.round(e.loaded/e.total*100);};
+    x.onload=()=>{if(x.status===401){location.href="/login";return;}try{resolve(JSON.parse(x.responseText));}catch(e){reject(e);}};
+    x.onerror=()=>reject(new Error("rete"));
+    x.send(f);
+  });
+}
+async function doImport(){
+  const files=$("imp_file").files;
+  if(!files.length){toast("Scegli almeno un file .db",false);return;}
+  const btn=$("b-imp");busy(btn,true,"Carico…");
+  const prog=$("imp_prog");prog.style.display="block";prog.value=0;
+  const log=$("imp_out");log.textContent="";log.className="out";
+  const ow=$("imp_over").checked?"1":"0";
+  let okAll=true;
+  for(const f of files){
+    if(!/\.db$/i.test(f.name)){log.textContent+="Salto "+f.name+": non è un .db\n";okAll=false;continue;}
+    prog.value=0;
+    try{
+      const res=await uploadOne(f,ow,prog);
+      log.textContent+=(res.ok?"Fatto: ":"Errore ("+f.name+"): ")+res.output+"\n";
+      if(!res.ok)okAll=false;
+    }catch(e){log.textContent+="Errore di rete: "+f.name+"\n";okAll=false;}
+  }
+  log.className="out "+(okAll?"ok":"err");
+  prog.style.display="none";busy(btn,false);
+  toast(okAll?"Importazione completata":"Importazione con errori",okAll);
+  refresh();
+}
+$("q_sql").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter")doSql();});
+const ROUTES={panoramica:["page-panoramica","Panoramica"],engine:["page-engine","Engine"],database:["page-database","Database"],servizi:["page-servizi","Avvii automatici"],importa:["page-importa","Importa database"],sql:["page-sql","Comandi SQL"],log:["page-log","Log"]};
+function go(r){if(location.hash!=="#/"+r)location.hash="#/"+r;else route();}
+function route(){
+  let r=(location.hash||"").replace(/^#\/?/,"")||"panoramica";
+  if(!ROUTES[r])r="panoramica";
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("on"));
+  $(ROUTES[r][0]).classList.add("on");
+  $("page-title").textContent=ROUTES[r][1];
+  document.querySelectorAll("#nav a").forEach(a=>a.classList.toggle("active",a.dataset.route===r));
+  window.scrollTo(0,0);
+}
+function renderImpList(){
+  const box=$("imp_list"),fs=$("imp_file").files;
+  if(!fs||!fs.length){box.innerHTML="";return;}
+  let h="";
+  for(const f of fs){h+='<div class="filerow"><span class="fname">'+esc(f.name)+'</span><span class="fsize">'+fmtMB(f.size)+"</span></div>";}
+  box.innerHTML=h;
+}
+(function(){
+  const dz=$("imp_drop"),fi=$("imp_file");
+  if(!dz||!fi)return;
+  const on=e=>{e.preventDefault();dz.classList.add("over");};
+  const off=e=>{e.preventDefault();dz.classList.remove("over");};
+  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,on));
+  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,off));
+  dz.addEventListener("drop",e=>{if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){fi.files=e.dataTransfer.files;renderImpList();}});
+  dz.addEventListener("click",e=>{if(e.target!==fi)fi.click();});
+  dz.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fi.click();}});
+  fi.addEventListener("change",renderImpList);
+})();
+async function doLogout(){try{await fetch("/api/logout",{method:"POST"});}catch(e){}location.href="/login";}
+window.addEventListener("hashchange",route);
+route();const safe=()=>refresh().catch(()=>{});safe();setInterval(safe,15000);
+</script>
+</body>
+</html>
